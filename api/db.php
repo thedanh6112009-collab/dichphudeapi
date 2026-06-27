@@ -1,13 +1,11 @@
 <?php
-// api/db.php (Mã nguồn chạy trên RENDER)
+// api/db.php (Mã nguồn chạy trên RENDER - Bản nâng cấp sửa lỗi xác thực)
 
-// Định nghĩa một hàm để gửi yêu cầu kết nối hộ về phía InfinityFree
 function query_infinity_bridge($action, $payload) {
-    // THAY ĐƯỜNG DẪN DƯỚI ĐÂY THÀNH ĐƯỜNG DẪN ĐẾN FILE BRIDGE TRÊN INFINITYFREE CỦA BẠN
     $url = "http://dichphude.great-site.net/db_bridge.php"; 
     
     $payload['bridge_action'] = $action;
-    $payload['bridge_secret'] = 'MatKhauBaoMat123'; // Khóa bảo mật tự chế để tránh người lạ phá hoại
+    $payload['bridge_secret'] = 'MatKhauBaoMat123'; 
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -19,26 +17,49 @@ function query_infinity_bridge($action, $payload) {
     return json_decode($response, true);
 }
 
-// Giả lập class PDO tối giản để không phải sửa các file login.php hay register.php của bạn
+// Class giả lập đầy đủ tính năng của PDO thực tế
 class BridgePDO {
     private $statement_action;
+    private $current_data = [];
+    private $pointer = 0;
+
     public function prepare($sql) {
         $this->statement_action = $sql;
         return $this;
     }
+
     public function execute($params = []) {
+        $this->pointer = 0;
         $res = query_infinity_bridge('execute', [
             'sql' => $this->statement_action,
             'params' => $params
         ]);
-        $_SESSION['last_bridge_res'] = $res['data'] ?? [];
-        return $res['status'] === 'success';
+        
+        if (isset($res['status']) && $res['status'] === 'success') {
+            $this->current_data = $res['data'] ?? [];
+            return true;
+        }
+        $this->current_data = [];
+        return false;
     }
+
+    // Sửa lỗi xác thực dữ liệu: Trả về false đúng chuẩn PHP khi không có bản ghi nào
     public function fetch($mode = null) {
-        $data = $_SESSION['last_bridge_res'] ?? [];
-        return !empty($data) ? $data[0] : false;
+        if ($this->pointer < count($this->current_data)) {
+            $row = $this->current_data[$this->pointer];
+            $this->pointer++;
+            return $row;
+        }
+        return false; 
+    }
+
+    public function fetchAll($mode = null) {
+        return $this->current_data;
+    }
+
+    public function rowCount() {
+        return count($this->current_data);
     }
 }
 
-// Đổi biến kết nối gốc thành class giả lập cầu nối
 $conn = new BridgePDO();
