@@ -1,65 +1,21 @@
 <?php
-// api/db.php (Mã nguồn chạy trên RENDER - Bản nâng cấp sửa lỗi xác thực)
+// api/db.php (Mã nguồn chạy trên RENDER - Bản sửa lỗi ký tự đặc biệt mật khẩu)
+header("Content-Type: application/json; charset=UTF-8");
 
-function query_infinity_bridge($action, $payload) {
-    $url = "http://dichphude.great-site.net/db_bridge.php"; 
-    
-    $payload['bridge_action'] = $action;
-    $payload['bridge_secret'] = 'MatKhauBaoMat123'; 
+$host = 'pg-3064389b-dichphude-2f09.l.aivencloud.com'; 
+$port = '15482'; 
+$db   = 'defaultdb';
+$user = 'avnadmin';
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    $response = curl_exec($ch);
-    curl_close($ch);
-    
-    return json_decode($response, true);
+// SỬ DỤNG NHÁY ĐƠN ĐỂ TRÁNH LỖI KÝ TỰ $
+$pass = 'AVNS_DOAkoPJywbouEH5sxfs'; 
+
+try {
+    $conn = new PDO("pgsql:host=$host;port=$port;dbname=$db", $user, $pass);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    echo json_encode(["status" => "error", "message" => "Lỗi kết nối cơ sở dữ liệu mới: " . $e->getMessage()]);
+    exit();
 }
-
-// Class giả lập đầy đủ tính năng của PDO thực tế
-class BridgePDO {
-    private $statement_action;
-    private $current_data = [];
-    private $pointer = 0;
-
-    public function prepare($sql) {
-        $this->statement_action = $sql;
-        return $this;
-    }
-
-    public function execute($params = []) {
-        $this->pointer = 0;
-        $res = query_infinity_bridge('execute', [
-            'sql' => $this->statement_action,
-            'params' => $params
-        ]);
-        
-        if (isset($res['status']) && $res['status'] === 'success') {
-            $this->current_data = $res['data'] ?? [];
-            return true;
-        }
-        $this->current_data = [];
-        return false;
-    }
-
-    // Sửa lỗi xác thực dữ liệu: Trả về false đúng chuẩn PHP khi không có bản ghi nào
-    public function fetch($mode = null) {
-        if ($this->pointer < count($this->current_data)) {
-            $row = $this->current_data[$this->pointer];
-            $this->pointer++;
-            return $row;
-        }
-        return false; 
-    }
-
-    public function fetchAll($mode = null) {
-        return $this->current_data;
-    }
-
-    public function rowCount() {
-        return count($this->current_data);
-    }
-}
-
-$conn = new BridgePDO();
+?>
