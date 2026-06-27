@@ -38,26 +38,24 @@ switch ($action) {
         break;
 
     case 'web_login':
-        // Tính năng xử lý riêng cho Giao diện Web để tạo Session đăng nhập
         header("Content-Type: application/json; charset=UTF-8");
         if (!file_exists("api/db.php")) {
             echo json_encode(["status" => "error", "message" => "Thiếu file cấu hình database api/db.php!"]);
             exit();
         }
-        require_once "api/db.php"; // Gọi file kết nối $conn của bạn
+        require_once "api/db.php"; 
         
         $data = json_decode(file_get_contents("php://input"), true);
         $user = trim($data['username'] ?? '');
         $pass = trim($data['password'] ?? '');
         
         try {
-            // Kiểm tra tài khoản trong bảng users
             $stmt = $conn->prepare("SELECT * FROM users WHERE username = :user");
             $stmt->execute(['user' => $user]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($row && password_verify($pass, $row['password'])) {
-                $_SESSION['user_logged'] = $row['username']; // Đánh dấu đã đăng nhập thành công
+                $_SESSION['user_logged'] = $row['username']; 
                 echo json_encode(["status" => "success", "message" => "Đăng nhập thành công!"]);
             } else {
                 echo json_encode(["status" => "error", "message" => "Tài khoản hoặc mật khẩu không chính xác!"]);
@@ -77,13 +75,12 @@ switch ($action) {
         break;
 
     default:
-        // Nếu đã đăng nhập trước đó rồi thì vào thẳng luôn trang chủ home.php
         if (isset($_SESSION['user_logged'])) {
             header("Location: home.php");
             exit();
         }
         
-        // HIỂN THỊ GIAO DIỆN WEB (ĐĂNG NHẬP / ĐĂNG KÝ MỚI PHONG CÁCH HOME.PHP)
+        // GIAO DIỆN WEB HIỆU ỨNG LIQUID GLASS SIÊU MƯỢT
         header("Content-Type: text/html; charset=UTF-8");
         ?>
         <!DOCTYPE html>
@@ -104,7 +101,7 @@ switch ($action) {
                 }
                 
                 body { 
-                    background: #030303; 
+                    background: #020205; 
                     color: #fff; 
                     min-height: 100vh; 
                     display: flex; 
@@ -115,7 +112,6 @@ switch ($action) {
                     padding: 20px;
                 }
 
-                /* Lớp Canvas bọc toàn bộ nền phía sau */
                 #particle-canvas {
                     position: fixed;
                     top: 0;
@@ -126,30 +122,83 @@ switch ($action) {
                     pointer-events: none;
                 }
 
-                /* Container Auth phong cách Glassmorphism của home.php */
-                .auth-container { 
+                /* --- CONTAINER HIỆU ỨNG LIQUID GLASS ĐA LỚP --- */
+                .liquid-glass-wrapper {
                     position: relative;
+                    width: 100%;
+                    max-width: 430px;
+                    padding: 4px; /* Tạo khoảng trống cho viền lỏng chạy */
+                    border-radius: 32px;
+                    overflow: hidden;
                     z-index: 1;
-                    background: rgba(15, 15, 20, 0.45); 
-                    border: 1px solid rgba(255, 255, 255, 0.05); 
-                    backdrop-filter: blur(20px);
-                    -webkit-backdrop-filter: blur(20px);
-                    padding: 45px 35px; 
-                    border-radius: 28px; 
-                    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(26, 115, 232, 0.03); 
-                    width: 100%; 
-                    max-width: 420px; 
-                    text-align: center; 
-                    transition: all 0.4s ease;
+                    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
                 }
 
+                /* Lớp nền luân chuyển gradient (Liquid Border Effect) */
+                .liquid-glass-wrapper::before {
+                    content: '';
+                    position: absolute;
+                    top: -50%;
+                    left: -50%;
+                    width: 200%;
+                    height: 200%;
+                    background: conic-gradient(
+                        transparent, 
+                        rgba(26, 115, 232, 0.4), 
+                        rgba(0, 229, 255, 0.5), 
+                        transparent 60%
+                    );
+                    animation: rotateLiquid 6s linear infinite;
+                    z-index: -2;
+                    opacity: 0.7;
+                    transition: opacity 0.5s ease;
+                }
+
+                /* Tăng độ sáng viền lỏng khi hover */
+                .liquid-glass-wrapper:hover::before {
+                    opacity: 1;
+                    animation-duration: 4s; /* Chạy nhanh hơn khi hover tạo cảm giác mượt hơn */
+                }
+
+                /* Thân chính của Container - Glassmorphic nâng cao */
+                .auth-container { 
+                    position: relative;
+                    background: rgba(10, 11, 18, 0.65); 
+                    border: 1px solid rgba(255, 255, 255, 0.03); 
+                    backdrop-filter: blur(30px) saturate(180%);
+                    -webkit-backdrop-filter: blur(30px) saturate(180%);
+                    padding: 45px 35px; 
+                    border-radius: 28px; 
+                    width: 100%; 
+                    text-align: center;
+                    z-index: 1;
+                }
+
+                /* Lớp lót bóng đổ nhòe tạo chiều sâu cho kính */
+                .auth-container::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 28px;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent);
+                    z-index: -1;
+                    pointer-events: none;
+                }
+
+                @keyframes rotateLiquid {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+
+                /* --- CÁC PHẦN TỬ THÀNH PHẦN KHÁC --- */
                 .logo-section {
                     margin-bottom: 25px;
                 }
                 .logo-section i {
-                    font-size: 32px;
-                    color: #1a73e8;
+                    font-size: 34px;
+                    color: #00e5ff;
                     margin-bottom: 12px;
+                    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5));
                 }
                 
                 h2 { 
@@ -157,16 +206,16 @@ switch ($action) {
                     font-weight: 700;
                     margin-bottom: 25px; 
                     letter-spacing: -0.5px;
-                    background: linear-gradient(135deg, #ffffff 0%, #b3b3b3 100%); 
+                    background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); 
                     -webkit-background-clip: text; 
                     -webkit-text-fill-color: transparent;
                 }
 
-                /* Tab chuyển đổi thanh mảnh như Google One */
+                /* Tab chuyển đổi hiệu ứng mượt mà */
                 .tabs { 
                     display: flex; 
                     margin-bottom: 30px; 
-                    background: rgba(255, 255, 255, 0.04); 
+                    background: rgba(255, 255, 255, 0.03); 
                     border: 1px solid rgba(255, 255, 255, 0.05);
                     border-radius: 30px; 
                     padding: 4px; 
@@ -179,17 +228,18 @@ switch ($action) {
                     font-size: 14px;
                     font-weight: 600; 
                     color: #94a3b8; 
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+                    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
                 }
                 .tab.active { 
-                    background: #1a73e8; 
+                    background: linear-gradient(135deg, #1a73e8, #00e5ff); 
                     color: white; 
-                    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.25);
+                    box-shadow: 0 4px 15px rgba(0, 229, 255, 0.25);
                 }
 
                 .form-group { 
                     text-align: left; 
                     margin-bottom: 22px; 
+                    position: relative;
                 }
                 label { 
                     display: block; 
@@ -199,69 +249,67 @@ switch ($action) {
                     color: #94a3b8; 
                 }
                 
-                /* Input phong cách hiện đại */
                 .input-wrapper {
                     position: relative;
                 }
                 .input-wrapper i {
                     position: absolute;
-                    left: 15px;
+                    left: 16px;
                     top: 50%;
                     transform: translateY(-50%);
                     color: #4b5563;
                     font-size: 15px;
-                    transition: color 0.3s;
+                    transition: all 0.3s ease;
                 }
                 input { 
                     width: 100%; 
-                    padding: 13px 15px 13px 45px; 
+                    padding: 14px 15px 14px 46px; 
                     border-radius: 14px; 
-                    border: 1px solid rgba(255, 255, 255, 0.06); 
-                    background: rgba(0, 0, 0, 0.2); 
+                    border: 1px solid rgba(255, 255, 255, 0.05); 
+                    background: rgba(0, 0, 0, 0.3); 
                     color: #fff; 
                     font-size: 15px; 
                     outline: none; 
-                    transition: all 0.3s ease; 
+                    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); 
                 }
                 input:focus { 
-                    border-color: #1a73e8; 
-                    background: rgba(0, 0, 0, 0.4);
-                    box-shadow: 0 0 15px rgba(26, 115, 232, 0.15); 
+                    border-color: #00e5ff; 
+                    background: rgba(0, 0, 0, 0.5);
+                    box-shadow: 0 0 15px rgba(0, 229, 255, 0.15); 
                 }
                 input:focus + i {
-                    color: #1a73e8;
+                    color: #00e5ff;
+                    filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.4));
                 }
                 
-                /* Nút hành động phong cách Google Blue */
                 button { 
                     width: 100%; 
                     padding: 14px; 
                     border: none; 
                     border-radius: 14px; 
-                    background: #1a73e8; 
+                    background: linear-gradient(135deg, #1a73e8, #00e5ff); 
                     color: white; 
                     font-size: 15px; 
                     font-weight: 600; 
                     cursor: pointer; 
-                    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+                    box-shadow: 0 4px 20px rgba(26, 115, 232, 0.3);
+                    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
                     margin-top: 10px; 
                 }
                 button:hover { 
-                    background: #1557b0; 
-                    transform: translateY(-1px);
-                    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.4);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 25px rgba(0, 229, 255, 0.4);
                 }
                 
-                /* Khu vực hiển thị tin nhắn thông báo */
                 #message { 
                     margin-top: 20px; 
                     font-size: 14px; 
                     min-height: 20px; 
                     line-height: 1.5; 
-                    padding: 10px;
-                    border-radius: 10px;
-                    transition: all 0.3s;
+                    padding: 12px;
+                    border-radius: 12px;
+                    transition: all 0.3s ease;
+                    animation: fadeIn 0.4s ease;
                 }
                 .success { 
                     background: rgba(52, 168, 83, 0.1); 
@@ -273,79 +321,86 @@ switch ($action) {
                     color: #ea4335; 
                     border: 1px solid rgba(234, 67, 53, 0.2);
                 }
+                
                 .hidden { display: none !important; }
+
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
             </style>
         </head>
         <body>
 
-        <!-- Nền hiệu ứng hạt trôi tự do và tương tác chuột từ home.php -->
+        <!-- Nền hạt chuyển động -->
         <canvas id="particle-canvas"></canvas>
 
-        <div class="auth-container">
-            <div class="logo-section">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <h2 id="authTitle">Đăng Nhập Hệ Thống</h2>
-            </div>
-            
-            <div class="tabs">
-                <div class="tab active" id="tabLogin" onclick="switchForm('login')">Đăng Nhập</div>
-                <div class="tab" id="tabRegister" onclick="switchForm('register')">Đăng Ký</div>
-            </div>
-            
-            <!-- FORM ĐĂNG NHẬP -->
-            <form id="loginForm">
-                <div class="form-group">
-                    <label>Tên tài khoản</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="loginUser" required placeholder="Nhập tên đăng nhập...">
-                        <i class="fa-solid fa-user"></i>
-                    </div>
+        <!-- WRAPPER CHỨA VIỀN LIQUID GLASS -->
+        <div class="liquid-glass-wrapper">
+            <div class="auth-container">
+                <div class="logo-section">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <h2 id="authTitle">Đăng Nhập Hệ Thống</h2>
                 </div>
-                <div class="form-group">
-                    <label>Mật khẩu</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="loginPass" required placeholder="Nhập mật khẩu...">
-                        <i class="fa-solid fa-lock"></i>
-                    </div>
+                
+                <div class="tabs">
+                    <div class="tab active" id="tabLogin" onclick="switchForm('login')">Đăng Nhập</div>
+                    <div class="tab" id="tabRegister" onclick="switchForm('register')">Đăng Ký</div>
                 </div>
-                <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Đăng Nhập Ngay</button>
-            </form>
+                
+                <!-- FORM ĐĂNG NHẬP -->
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>Tên tài khoản</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="loginUser" required placeholder="Nhập tên đăng nhập...">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Mật khẩu</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="loginPass" required placeholder="Nhập mật khẩu...">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                    </div>
+                    <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Đăng Nhập Ngay</button>
+                </form>
 
-            <!-- FORM ĐĂNG KÝ -->
-            <form id="registerForm" class="hidden">
-                <div class="form-group">
-                    <label>Tên tài khoản mới</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="regUser" required placeholder="Tạo tên đăng nhập...">
-                        <i class="fa-solid fa-user-plus"></i>
+                <!-- FORM ĐĂNG KÝ -->
+                <form id="registerForm" class="hidden">
+                    <div class="form-group">
+                        <label>Tên tài khoản mới</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="regUser" required placeholder="Tạo tên đăng nhập...">
+                            <i class="fa-solid fa-user-plus"></i>
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Email (Không bắt buộc)</label>
-                    <div class="input-wrapper">
-                        <input type="email" id="regEmail" placeholder="Nhập email của bạn...">
-                        <i class="fa-solid fa-envelope"></i>
+                    <div class="form-group">
+                        <label>Email (Không bắt buộc)</label>
+                        <div class="input-wrapper">
+                            <input type="email" id="regEmail" placeholder="Nhập email của bạn...">
+                            <i class="fa-solid fa-envelope"></i>
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Mật khẩu</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="regPass" required placeholder="Tạo mật khẩu bảo mật...">
-                        <i class="fa-solid fa-key"></i>
+                    <div class="form-group">
+                        <label>Mật khẩu</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="regPass" required placeholder="Tạo mật khẩu bảo mật...">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
                     </div>
-                </div>
-                <button type="submit" style="background: #34a853; box-shadow: 0 4px 15px rgba(52, 168, 83, 0.3);"><i class="fa-solid fa-user-check"></i> Đăng Ký Tài Khoản</button>
-            </form>
+                    <button type="submit" style="background: linear-gradient(135deg, #34a853, #2bb673); box-shadow: 0 4px 20px rgba(52, 168, 83, 0.3);"><i class="fa-solid fa-user-check"></i> Đăng Ký Tài Khoản</button>
+                </form>
 
-            <div id="message"></div>
+                <div id="message"></div>
+            </div>
         </div>
 
         <script>
-            // Chuyển đổi qua lại giữa Đăng Nhập và Đăng Ký
             function switchForm(mode) {
                 const msgDiv = document.getElementById('message');
                 msgDiv.innerHTML = '';
-                msgDiv.className = '';
                 msgDiv.style.display = 'none';
                 
                 if(mode === 'login') {
@@ -431,30 +486,16 @@ switch ($action) {
                 });
             });
 
-            // --- JAVASCRIPT ANIMATION CANVAS (ĐỒNG BỘ 100% TỪ HOME.PHP) ---
+            // --- JAVASCRIPT ANIMATION CANVAS ---
             const canvas = document.getElementById('particle-canvas');
             const ctx = canvas.getContext('2d');
-
             let particlesArray = [];
             const numberOfParticles = 80; 
-
             const mouse = { x: null, y: null, radius: 180 };
 
-            window.addEventListener('mousemove', function(event) {
-                mouse.x = event.clientX;
-                mouse.y = event.clientY;
-            });
-
-            window.addEventListener('mouseout', function() {
-                mouse.x = null;
-                mouse.y = null;
-            });
-
-            window.addEventListener('resize', function() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                init();
-            });
+            window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+            window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
+            window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; init(); });
 
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -467,19 +508,15 @@ switch ($action) {
                     this.speedX = (Math.random() * 1) - 0.5;
                     this.speedY = (Math.random() * 1) - 0.5;
                 }
-
                 update() {
                     this.x += this.speedX;
                     this.y += this.speedY;
-
                     if (this.x < 0 || this.x > canvas.width) this.speedX = -this.speedX;
                     if (this.y < 0 || this.y > canvas.height) this.speedY = -this.speedY;
-
                     if (mouse.x != null && mouse.y != null) {
                         let dx = mouse.x - this.x;
                         let dy = mouse.y - this.y;
                         let distance = Math.sqrt(dx * dx + dy * dy);
-                        
                         if (distance < mouse.radius) {
                             let force = (mouse.radius - distance) / mouse.radius;
                             this.x += (dx / distance) * force * 2;
@@ -487,47 +524,28 @@ switch ($action) {
                         }
                     }
                 }
-
                 draw() {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.closePath();
-                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.closePath(); ctx.fill();
                 }
             }
 
             function init() {
                 particlesArray = [];
-                for (let i = 0; i < numberOfParticles; i++) {
-                    particlesArray.push(new Particle());
-                }
+                for (let i = 0; i < numberOfParticles; i++) particlesArray.push(new Particle());
             }
 
             function connectParticles() {
-                let opacityValue = 1;
                 for (let a = 0; a < particlesArray.length; a++) {
                     for (let b = a; b < particlesArray.length; b++) {
                         let dx = particlesArray[a].x - particlesArray[b].x;
                         let dy = particlesArray[a].y - particlesArray[b].y;
                         let distance = Math.sqrt(dx * dx + dy * dy);
-
                         if (distance < 110) {
-                            opacityValue = 1 - (distance / 110);
-                            if (mouse.x != null) {
-                                let mdx = mouse.x - particlesArray[a].x;
-                                let mdy = mouse.y - particlesArray[a].y;
-                                let mDist = Math.sqrt(mdx * mdx + mdy * mdy);
-                                if (mDist < mouse.radius) {
-                                    opacityValue *= 2; 
-                                }
-                            }
-                            ctx.strokeStyle = `rgba(26, 115, 232, ${opacityValue * 0.15})`;
+                            let opacityValue = 1 - (distance / 110);
+                            ctx.strokeStyle = `rgba(0, 229, 255, ${opacityValue * 0.12})`;
                             ctx.lineWidth = 0.8;
-                            ctx.beginPath();
-                            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
-                            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
-                            ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(particlesArray[a].x, particlesArray[a].y); ctx.lineTo(particlesArray[b].x, particlesArray[b].y); ctx.stroke();
                         }
                     }
                 }
@@ -536,17 +554,13 @@ switch ($action) {
             function animate() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 for (let i = 0; i < particlesArray.length; i++) {
-                    particlesArray[i].update();
-                    particlesArray[i].draw();
+                    particlesArray[i].update(); particlesArray[i].draw();
                 }
                 connectParticles();
                 requestAnimationFrame(animate);
             }
-
-            init();
-            animate();
+            init(); animate();
         </script>
-
         </body>
         </html>
         <?php
