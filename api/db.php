@@ -1,22 +1,44 @@
 <?php
-// api/db.php
-header("Content-Type: application/json; charset=UTF-8");
+// api/db.php (Mã nguồn chạy trên RENDER)
 
-// Thông số kết nối lấy chính xác từ ảnh {69D74204-D203-4826-9F34-541D6F38FB12}.png
-$host = "sql308.infinityfree.com";        
-$db_name = "if0_42280779_dichphude"; 
-$username = "if0_42280779"; 
-$password = "0905047832q"; 
+// Định nghĩa một hàm để gửi yêu cầu kết nối hộ về phía InfinityFree
+function query_infinity_bridge($action, $payload) {
+    // THAY ĐƯỜNG DẪN DƯỚI ĐÂY THÀNH ĐƯỜNG DẪN ĐẾN FILE BRIDGE TRÊN INFINITYFREE CỦA BẠN
+    $url = "http://dichphude.great-site.net/db_bridge.php"; 
+    
+    $payload['bridge_action'] = $action;
+    $payload['bridge_secret'] = 'MatKhauBaoMat123'; // Khóa bảo mật tự chế để tránh người lạ phá hoại
 
-try {
-    $conn = new PDO("mysql:host=" . $host . ";dbname=" . $db_name . ";charset=utf8", $username, $password);
-    // Cấu hình báo lỗi PDO để dễ dàng kiểm tra lỗi nếu có
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $exception) {
-    echo json_encode([
-        "status" => "error",
-        "message" => "Lỗi kết nối cơ sở dữ liệu: " . $exception->getMessage()
-    ]);
-    exit();
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    return json_decode($response, true);
 }
-?>
+
+// Giả lập class PDO tối giản để không phải sửa các file login.php hay register.php của bạn
+class BridgePDO {
+    private $statement_action;
+    public function prepare($sql) {
+        $this->statement_action = $sql;
+        return $this;
+    }
+    public function execute($params = []) {
+        $res = query_infinity_bridge('execute', [
+            'sql' => $this->statement_action,
+            'params' => $params
+        ]);
+        $_SESSION['last_bridge_res'] = $res['data'] ?? [];
+        return $res['status'] === 'success';
+    }
+    public function fetch($mode = null) {
+        $data = $_SESSION['last_bridge_res'] ?? [];
+        return !empty($data) ? $data[0] : false;
+    }
+}
+
+// Đổi biến kết nối gốc thành class giả lập cầu nối
+$conn = new BridgePDO();
