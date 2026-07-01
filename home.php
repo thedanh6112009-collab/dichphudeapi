@@ -12,7 +12,7 @@ $has_premium_key = false;
 // CHỈ KIỂM TRA KEY KHI USER ĐÃ ĐĂNG NHẬP
 if ($is_logged_in && $user_id) {
     // Nhúng file db.php kết nối database
-    require_once 'db.php'; 
+    require_once 'api/db.php';
 
     try {
         // Kiểm tra xem user này đã kích hoạt hoặc có đơn hàng thành công nào chưa
