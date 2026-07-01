@@ -1,62 +1,80 @@
 <?php
-// api_handler.php (Đặt tại thư mục gốc của hosting, ngang hàng với index.php)
+// api_handler.php - Xử lý API đồng bộ trạng thái thanh toán thủ công
+session_start();
+header('Content-Type: application/json');
 
-// Cấu hình các Header phản hồi JSON và chống lỗi bảo mật CORS cho API
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
-header("Content-Type: application/json; charset=UTF-8");
-
-// Xử lý request dạng OPTIONS của API
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+// Nhúng file kết nối CSDL PostgreSQL
+if (file_exists("api/db.php")) {
+    require_once "api/db.php";
+} elseif (file_exists("db.php")) {
+    require_once "db.php";
+} else {
+    echo json_encode(["status" => "error", "message" => "Không tìm thấy file db.php"]);
     exit();
 }
 
-// Lấy dữ liệu JSON gửi từ body lên nếu có
-$inputData = json_decode(file_get_contents("php://input"), true);
+$action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// Kiểm tra tham số 'action' từ URL (GET) hoặc từ Body (POST JSON)
-$action = '';
-if (isset($_GET['action'])) {
-    $action = strtolower(trim($_GET['action']));
-} elseif (isset($inputData['action'])) {
-    $action = strtolower(trim($inputData['action']));
-}
-
-// Bộ định tuyến kết nối các tính năng API xử lý backend
 switch ($action) {
-    
-    case 'register':
-        if (file_exists("api/register.php")) {
-            require_once "api/register.php";
-        } else {
-            echo json_encode(["status" => "error", "message" => "Hệ thống thiếu file xử lý đăng ký!"]);
+    // =========================================================================
+    // HÀM KIỂM TRA TRẠNG THÁI VÀ TỰ ĐỘNG ĐỒNG BỘ LÊN VIP KHI ADMIN DUYỆT TAY
+    // =========================================================================
+    case 'check_premium_status':
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(["is_premium" => 0, "message" => "Chưa đăng nhập"]);
+            exit();
         }
-        break;
 
-    case 'login':
-        if (file_exists("api/login.php")) {
-            require_once "api/login.php";
-        } else {
-            echo json_encode(["status" => "error", "message" => "Hệ thống thiếu file xử lý đăng nhập!"]);
-        }
-        break;
+        $u_id = $_SESSION['user_id'];
+        try {
+            // 1. Quét bảng payment_keys xem Admin đã duyệt đơn hàng nào của User này chưa (status = 1)
+            $stmtOrder = $conn->prepare("SELECT id, package FROM payment_keys WHERE user_id = :user_id AND status = 1 LIMIT 1");
+            $stmtOrder->execute(['user_id' => $u_id]);
+            $order = $stmtOrder->fetch(PDO::FETCH_ASSOC);
 
-    case 'activate':
-        if (file_exists("api/activate_key.php")) {
-            require_once "api/activate_key.php";
-        } else {
-            echo json_encode(["status" => "error", "message" => "Hệ thống thiếu file kích hoạt key!"]);
+            if ($order) {
+                // Nếu tìm thấy đơn hàng vừa được Admin duyệt, tiến hành kích hoạt tài khoản
+                $conn->beginTransaction();
+
+                // Nâng cấp user lên Premium (Hạn 30 ngày kể từ lúc duyệt đơn)
+                $expire_date = date('Y-m-d H:i:s', strtotime('+30 days'));
+                $updateUser = $conn->prepare("UPDATE users SET is_premium = 1, premium_expire = :expire WHERE id = :user_id");
+                $updateUser->execute([
+                    'expire' => $expire_date,
+                    'user_id' => $u_id
+                ]);
+
+                // Đổi status sang = 2 (Đã xử lý kích hoạt) để tránh vòng lặp UPDATE liên tục
+                $updateOrder = $conn->prepare("UPDATE payment_keys SET status = 2 WHERE id = :id");
+                $updateOrder->execute(['id' => $order['id']]);
+
+                $conn->commit();
+                
+                // Trả về kết quả 1 để kích hoạt JavaScript chuyển hướng trình duyệt của khách
+                echo json_encode(["is_premium" => 1]);
+                exit();
+            }
+
+            // 2. Nếu không có đơn hàng nào vừa duyệt, kiểm tra trực tiếp trạng thái hiện tại trong bảng users
+            $stmtUser = $conn->prepare("SELECT is_premium FROM users WHERE id = :id LIMIT 1");
+            $stmtUser->execute(['id' => $u_id]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && (int)$user['is_premium'] === 1) {
+                echo json_encode(["is_premium" => 1]);
+            } else {
+                echo json_encode(["is_premium" => 0]);
+            }
+
+        } catch (Exception $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            echo json_encode(["is_premium" => 0, "error" => $e->getMessage()]);
         }
         break;
 
     default:
-        // Nếu không khớp hành động nào hoặc gọi sai cách
-        echo json_encode([
-            "status" => "error", 
-            "message" => "Yêu cầu không hợp lệ hoặc không xác định được hành động (action)!"
-        ]);
+        echo json_encode(["status" => "error", "message" => "Hành động API không hợp lệ"]);
         break;
 }
-?>
