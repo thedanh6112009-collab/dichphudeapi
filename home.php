@@ -1,16 +1,43 @@
 <?php
 session_start();
 
+// Kiểm tra trạng thái đăng nhập
+$is_logged_in = isset($_SESSION['user_logged']);
+$username = $is_logged_in ? $_SESSION['user_logged'] : '';
+$user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+
+// Khai báo mảng chứa danh sách key của user
+$user_keys = [];
+
+// CHỈ KHAI THÁC KEY KHI USER ĐÃ ĐĂNG NHẬP
+if ($is_logged_in && $user_id) {
+    // Nhúng file db.php kết nối PostgreSQL trên Aiven Cloud
+    require_once 'db.php'; 
+
+    try {
+        // Sử dụng biến kết nối $conn đã được khởi tạo trong file db.php của bạn
+        // Cú pháp PostgreSQL: không sử dụng dấu nháy huyền ``, tên cột viết thường
+        $sql = "SELECT key_code, target_level, duration_days, status, device_id, activated_at 
+                FROM activation_keys 
+                WHERE user_id = :user_id 
+                ORDER BY created_at DESC";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['user_id' => $user_id]);
+        $user_keys = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (PDOException $e) {
+        // Lưu thông báo lỗi nếu không lấy được dữ liệu để tránh sập giao diện web
+        $error_db = "Không thể kết nối CSDL để lấy thông tin mã Key.";
+    }
+}
+
 // Xử lý nút Đăng xuất
 if (isset($_GET['logout'])) {
     session_destroy();
     header("Location: home.php");
     exit();
 }
-
-// Kiểm tra trạng thái đăng nhập
-$is_logged_in = isset($_SESSION['user_logged']);
-$username = $is_logged_in ? $_SESSION['user_logged'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -119,6 +146,82 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             -webkit-text-fill-color: transparent; 
         }
         .title-section p { color: #8c8c8c; font-size: 17px; margin-bottom: 60px; }
+
+        /* ================= KHOANG QUẢN LÝ KEY / TRẠNG THÁI TÀI KHOẢN ================= */
+        .my-status-section {
+            background: rgba(20, 20, 30, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px;
+            margin-bottom: 50px;
+            text-align: left;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.4);
+        }
+        .my-status-section h2 { font-size: 19px; font-weight: 700; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .my-status-section h2 i { color: #1a73e8; }
+        
+        /* Box hiển thị Tài khoản miễn phí */
+        .free-account-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .free-account-text h3 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+        .free-account-text p { font-size: 13.5px; color: #8c8c8c; }
+        .badge-free {
+            background: rgba(66, 133, 244, 0.1);
+            color: #4285F4;
+            border: 1px solid rgba(66, 133, 244, 0.3);
+            padding: 6px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Danh sách Key */
+        .key-list { display: flex; flex-direction: column; gap: 12px; }
+        .key-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 18px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+        .key-item:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+        
+        .key-info-left { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .key-badge { padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .key-badge.pro { background: rgba(52, 168, 83, 0.12); color: #34a853; border: 1px solid rgba(52, 168, 83, 0.25); }
+        .key-badge.ultra { background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.25); }
+        
+        .key-code-display { font-family: 'Courier New', Courier, monospace; font-size: 16px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.25); letter-spacing: 1px; }
+        
+        .key-status { font-size: 13.5px; color: #b3b3b3; display: flex; align-items: center; gap: 6px; }
+        .key-status span.unused { color: #fbbc04; font-weight: 600; }
+        .key-status span.used { color: #7c7c8c; }
+        .key-status code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #e2e8f0; font-family: monospace; }
+        
+        .btn-copy { background: rgba(26, 115, 232, 0.1); border: 1px solid rgba(26, 115, 232, 0.35); color: #1a73e8; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn-copy:hover { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+        /* ============================================================================ */
 
         /* Bảng giá 3 cột hiệu ứng Glassmorphism */
         .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 30px; margin-top: 20px; }
@@ -239,6 +342,52 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             <p>Tăng tốc 300% hiệu suất làm video, phim ngắn, TikTok Reels bằng trí tuệ nhân tạo chuyên sâu</p>
         </div>
 
+        <?php if ($is_logged_in): ?>
+            <div class="my-status-section">
+                <h2><i class="fa-solid fa-circle-user"></i> Trạng thái phân cấp tài khoản</h2>
+                
+                <?php if (isset($error_db)): ?>
+                    <div style="color: #ea4335; font-size: 14px;"><i class="fa-solid fa-circle-exclamation"></i> <?php echo $error_db; ?></div>
+                
+                <?php elseif (empty($user_keys)): ?>
+                    <div class="free-account-box">
+                        <div class="free-account-text">
+                            <h3>Hệ thống phần mềm cục bộ</h3>
+                            <p>Bạn chưa kích hoạt mã bản quyền Premium. Các tính năng mở rộng đám mây tạm thời khóa.</p>
+                        </div>
+                        <span class="badge-free">
+                            <i class="fa-solid fa-gift"></i> Tài khoản miễn phí
+                        </span>
+                    </div>
+                
+                <?php else: ?>
+                    <div class="key-list">
+                        <?php foreach ($user_keys as $key): ?>
+                            <div class="key-item">
+                                <div class="key-info-left">
+                                    <span class="key-badge <?php echo htmlspecialchars(strtolower($key['target_level'] ?? 'pro')); ?>">
+                                        <?php echo htmlspecialchars($key['target_level'] ?? 'PRO'); ?> (<?php echo htmlspecialchars($key['duration_days'] ?? '30'); ?> ngày)
+                                    </span>
+                                    <span class="key-code-display"><?php echo htmlspecialchars($key['key_code']); ?></span>
+                                </div>
+                                
+                                <div class="key-status">
+                                    <?php if (($key['status'] ?? 0) == 0): ?>
+                                        <span class="unused"><i class="fa-solid fa-circle-dot" style="font-size:10px;"></i> Sẵn sàng kích hoạt</span>
+                                    <?php else: ?>
+                                        <span class="used"><i class="fa-solid fa-circle-check"></i> Đã dùng trên thiết bị: <code><?php echo htmlspecialchars($key['device_id'] ?? 'Unknown'); ?></code></span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <button class="btn-copy" onclick="copyKey('<?php echo htmlspecialchars($key['key_code']); ?>', this)">
+                                    <i class="fa-regular fa-copy"></i> Sao chép Key
+                                </button>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <div class="pricing-grid">
             <div class="price-card">
                 <div class="badge">Mặc định</div>
@@ -330,72 +479,78 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
     </footer>
 
     <script>
+        function copyKey(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã sao chép!';
+                btn.style.background = '#34a853';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#34a853';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = 'rgba(26, 115, 232, 0.1)';
+                    btn.style.color = '#1a73e8';
+                    btn.style.borderColor = 'rgba(26, 115, 232, 0.35)';
+                }, 2000);
+            }).catch(err => {
+                alert('Không thể tự sao chép, hãy bôi đen mã này để copy: ' + text);
+            });
+        }
+    </script>
+
+    <script>
         const canvas = document.getElementById('particle-canvas');
         const ctx = canvas.getContext('2d');
 
         let particlesArray = [];
-        const numberOfParticles = 100; // Số lượng hạt hiển thị trên màn hình
+        const numberOfParticles = 100;
 
-        // Đối tượng lưu vị trí chuột
-        const mouse = {
-            x: null,
-            y: null,
-            radius: 180 // Bán kính khu vực tương tác hút/đẩy hạt quanh chuột
-        };
+        const mouse = { x: null, y: null, radius: 180 };
 
-        // Lắng nghe sự kiện di chuyển chuột toàn bộ màn hình
         window.addEventListener('mousemove', function(event) {
             mouse.x = event.clientX;
             mouse.y = event.clientY;
         });
 
-        // Khi chuột rời khỏi màn hình thì xóa tọa độ để hạt quay lại trạng thái tự do
         window.addEventListener('mouseout', function() {
             mouse.x = null;
             mouse.y = null;
         });
 
-        // Tự động căn chỉnh lại kích thước Canvas khi thay đổi độ rộng trình duyệt
         window.addEventListener('resize', function() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             init();
         });
 
-        // Thiết lập kích thước Canvas ban đầu
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Định nghĩa lớp Hạt (Particle)
         class Particle {
             constructor() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 1; // Kích thước hạt từ 1px đến 3px
-                this.speedX = (Math.random() * 1) - 0.5; // Tốc độ trôi tự do X
-                this.speedY = (Math.random() * 1) - 0.5; // Tốc độ trôi tự do Y
+                this.size = Math.random() * 2 + 1;
+                this.speedX = (Math.random() * 1) - 0.5;
+                this.speedY = (Math.random() * 1) - 0.5;
                 this.baseX = this.x;
                 this.baseY = this.y;
             }
 
-            // Cập nhật vị trí và logic tương tác chuột
             update() {
-                // Trôi tự do
                 this.x += this.speedX;
                 this.y += this.speedY;
 
-                // Kiểm tra va chạm viền màn hình để bật ngược lại
                 if (this.x < 0 || this.x > canvas.width) this.speedX = -this.speedX;
                 if (this.y < 0 || this.y > canvas.height) this.speedY = -this.speedY;
 
-                // Tương tác hút/đẩy mềm mại khi chuột ở gần hạt (Giống Antigravity IDE)
                 if (mouse.x != null && mouse.y != null) {
                     let dx = mouse.x - this.x;
                     let dy = mouse.y - this.y;
                     let distance = Math.sqrt(dx * dx + dy * dy);
                     
                     if (distance < mouse.radius) {
-                        // Tính toán lực hút nhẹ đưa hạt dịch chuyển dần về hướng chuột
                         let force = (mouse.radius - distance) / mouse.radius;
                         this.x += (dx / distance) * force * 2.5;
                         this.y += (dy / distance) * force * 2.5;
@@ -403,7 +558,6 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
                 }
             }
 
-            // Vẽ hạt lên Canvas
             draw() {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
                 ctx.beginPath();
@@ -413,7 +567,6 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             }
         }
 
-        // Khởi tạo danh sách các hạt ban đầu
         function init() {
             particlesArray = [];
             for (let i = 0; i < numberOfParticles; i++) {
@@ -421,7 +574,6 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             }
         }
 
-        // Tạo liên kết mạng lưới (Đường thẳng nối giữa các hạt gần nhau)
         function connectParticles() {
             let opacityValue = 1;
             for (let a = 0; a < particlesArray.length; a++) {
@@ -430,10 +582,8 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
                     let dy = particlesArray[a].y - particlesArray[b].y;
                     let distance = Math.sqrt(dx * dx + dy * dy);
 
-                    // Nếu khoảng cách giữa 2 hạt nhỏ hơn 110px thì vẽ nét nối liền mờ
                     if (distance < 110) {
                         opacityValue = 1 - (distance / 110);
-                        // Đậm hơn nếu ở gần vùng trỏ chuột
                         if (mouse.x != null) {
                             let mdx = mouse.x - particlesArray[a].x;
                             let mdy = mouse.y - particlesArray[a].y;
@@ -442,7 +592,7 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
                                 opacityValue *= 2; 
                             }
                         }
-                        ctx.strokeStyle = `rgba(26, 115, 232, ${opacityValue * 0.18})`; // Màu xanh nhạt mờ thương hiệu Google
+                        ctx.strokeStyle = `rgba(26, 115, 232, ${opacityValue * 0.18})`;
                         ctx.lineWidth = 0.8;
                         ctx.beginPath();
                         ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
@@ -453,7 +603,6 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             }
         }
 
-        // Vòng lặp Render liên tục (Animation Loop) đạt hiệu suất 60fps+ mượt mà
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (let i = 0; i < particlesArray.length; i++) {
@@ -464,7 +613,6 @@ $username = $is_logged_in ? $_SESSION['user_logged'] : '';
             requestAnimationFrame(animate);
         }
 
-        // Chạy khởi tạo ứng dụng nền
         init();
         animate();
     </script>
