@@ -6,29 +6,26 @@ $is_logged_in = isset($_SESSION['user_logged']);
 $username = $is_logged_in ? $_SESSION['user_logged'] : '';
 $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
-// Khai báo mảng chứa danh sách key của user
-$user_keys = [];
+// Khai báo biến lưu trạng thái Key Premium trong Database
+$has_premium_key = false;
 
-// CHỈ KHAI THÁC KEY KHI USER ĐÃ ĐĂNG NHẬP
+// CHỈ KIỂM TRA KEY KHI USER ĐÃ ĐĂNG NHẬP
 if ($is_logged_in && $user_id) {
-    // Nhúng file db.php kết nối PostgreSQL trên Aiven Cloud
+    // Nhúng file db.php kết nối database
     require_once 'db.php'; 
 
     try {
-        // Sử dụng biến kết nối $conn đã được khởi tạo trong file db.php của bạn
-        // Cú pháp PostgreSQL: không sử dụng dấu nháy huyền ``, tên cột viết thường
-        $sql = "SELECT key_code, target_level, duration_days, status, device_id, activated_at 
-                FROM activation_keys 
-                WHERE user_id = :user_id 
-                ORDER BY created_at DESC";
-        
+        // Kiểm tra xem user này đã kích hoạt hoặc có đơn hàng thành công nào chưa
+        // Bạn có thể check qua bảng users (is_premium = 1) hoặc bảng activation_keys tùy logic cấu trúc cũ
+        $sql = "SELECT is_premium FROM users WHERE id = :user_id AND is_premium = 1 LIMIT 1";
         $stmt = $conn->prepare($sql);
         $stmt->execute(['user_id' => $user_id]);
-        $user_keys = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+        
+        if ($stmt->rowCount() > 0) {
+            $has_premium_key = true;
+        }
     } catch (PDOException $e) {
-        // Lưu thông báo lỗi nếu không lấy được dữ liệu để tránh sập giao diện web
-        $error_db = "Không thể kết nối CSDL để lấy thông tin mã Key.";
+        $has_premium_key = false;
     }
 }
 
@@ -74,15 +71,15 @@ if (isset($_GET['logout'])) {
             width: 100%;
             height: 100%;
             z-index: 0;
-            pointer-events: none; /* Cho phép tương tác xuyên qua canvas xuống các nút bấm */
+            pointer-events: none;
         }
 
-        /* Header phong cách Google One / Apple */
+        /* Header phong cách hiện đại */
         nav { 
             background: rgba(3, 3, 3, 0.7); 
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            padding: 18px 6%; 
+            padding: 14px 6%; 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
@@ -94,141 +91,106 @@ if (isset($_GET['logout'])) {
         nav .logo { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
         nav .logo span { color: #1a73e8; }
         
-        nav .user-actions { display: flex; align-items: center; gap: 20px; }
-        nav .user-info { font-size: 14px; color: #aaa; }
-        nav .user-info b { color: #fff; }
+        nav .user-actions { display: flex; align-items: center; gap: 15px; }
+        
+        /* Cụm thông tin tài khoản và trạng thái bản quyền */
+        .account-status-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 13.5px;
+        }
+        .account-status-wrapper .username-txt { color: #aaa; }
+        .account-status-wrapper .username-txt b { color: #fff; }
+
+        /* Badge Trạng thái Tài khoản Miễn phí */
+        .badge-header-free {
+            background: rgba(234, 67, 53, 0.1);
+            color: #ea4335;
+            border: 1px solid rgba(234, 67, 53, 0.25);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        /* Badge Trạng thái Tài khoản Premium */
+        .badge-header-premium {
+            background: rgba(52, 168, 83, 0.12);
+            color: #34a853;
+            border: 1px solid rgba(52, 168, 83, 0.25);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
         
         .btn-auth { 
             background: #1a73e8; 
             color: white; 
             text-decoration: none; 
-            padding: 10px 24px; 
+            padding: 8px 20px; 
             border-radius: 24px; 
-            font-size: 14px; 
+            font-size: 13.5px; 
             font-weight: 600; 
             box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            transition: all 0.3s ease; 
         }
-        .btn-auth:hover { background: #1557b0; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26, 115, 232, 0.4); }
+        .btn-auth:hover { background: #1557b0; transform: translateY(-1px); }
         
         .btn-logout { 
             background: transparent; 
             color: #ff4a4a; 
             text-decoration: none; 
-            font-size: 14px; 
+            font-size: 13px; 
             font-weight: 600; 
-            padding: 8px 18px;
-            border: 1px solid rgba(255, 74, 74, 0.4);
+            padding: 6px 14px;
+            border: 1px solid rgba(255, 74, 74, 0.3);
             border-radius: 24px;
             transition: all 0.3s;
         }
-        .btn-logout:hover { background: rgba(255, 74, 74, 0.1); border-color: #ff4a4a; }
+        .btn-logout:hover { background: rgba(255, 74, 74, 0.08); border-color: #ff4a4a; }
 
         /* Khung nội dung chính */
         .container { 
             position: relative;
-            z-index: 1; /* Đẩy nội dung lên trên canvas */
+            z-index: 1; 
             flex: 1; 
             max-width: 1200px; 
             width: 100%; 
             margin: 0 auto; 
-            padding: 60px 20px; 
+            padding: 50px 20px; 
             text-align: center; 
         }
         
         .title-section h1 { 
-            font-size: 46px; 
+            font-size: 42px; 
             font-weight: 700; 
-            margin-bottom: 15px; 
+            margin-bottom: 12px; 
             letter-spacing: -1px;
             background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%); 
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent; 
         }
-        .title-section p { color: #8c8c8c; font-size: 17px; margin-bottom: 60px; }
-
-        /* ================= KHOANG QUẢN LÝ KEY / TRẠNG THÁI TÀI KHOẢN ================= */
-        .my-status-section {
-            background: rgba(20, 20, 30, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 30px;
-            margin-bottom: 50px;
-            text-align: left;
-            box-shadow: 0 20px 45px rgba(0,0,0,0.4);
-        }
-        .my-status-section h2 { font-size: 19px; font-weight: 700; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
-        .my-status-section h2 i { color: #1a73e8; }
-        
-        /* Box hiển thị Tài khoản miễn phí */
-        .free-account-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px dashed rgba(255, 255, 255, 0.15);
-            border-radius: 16px;
-            padding: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        .free-account-text h3 { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-        .free-account-text p { font-size: 13.5px; color: #8c8c8c; }
-        .badge-free {
-            background: rgba(66, 133, 244, 0.1);
-            color: #4285F4;
-            border: 1px solid rgba(66, 133, 244, 0.3);
-            padding: 6px 16px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Danh sách Key */
-        .key-list { display: flex; flex-direction: column; gap: 12px; }
-        .key-item {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 18px 22px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-            transition: all 0.3s;
-        }
-        .key-item:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
-        
-        .key-info-left { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .key-badge { padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        .key-badge.pro { background: rgba(52, 168, 83, 0.12); color: #34a853; border: 1px solid rgba(52, 168, 83, 0.25); }
-        .key-badge.ultra { background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.25); }
-        
-        .key-code-display { font-family: 'Courier New', Courier, monospace; font-size: 16px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.25); letter-spacing: 1px; }
-        
-        .key-status { font-size: 13.5px; color: #b3b3b3; display: flex; align-items: center; gap: 6px; }
-        .key-status span.unused { color: #fbbc04; font-weight: 600; }
-        .key-status span.used { color: #7c7c8c; }
-        .key-status code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #e2e8f0; font-family: monospace; }
-        
-        .btn-copy { background: rgba(26, 115, 232, 0.1); border: 1px solid rgba(26, 115, 232, 0.35); color: #1a73e8; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-        .btn-copy:hover { background: #1a73e8; color: #fff; border-color: #1a73e8; }
-        /* ============================================================================ */
+        .title-section p { color: #8c8c8c; font-size: 16px; margin-bottom: 50px; }
 
         /* Bảng giá 3 cột hiệu ứng Glassmorphism */
         .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 30px; margin-top: 20px; }
         
         .price-card { 
-            background: rgba(15, 15, 20, 0.4); 
-            border: 1px solid rgba(255, 255, 255, 0.04); 
+            background: rgba(255, 255, 255, 0.01); 
+            border: 1px solid rgba(255, 255, 255, 0.03); 
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-radius: 28px; 
@@ -240,17 +202,18 @@ if (isset($_GET['logout'])) {
             transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .price-card:hover { 
+            background: rgba(255, 255, 255, 0.03);
             transform: translateY(-8px);
             border-color: rgba(26, 115, 232, 0.4); 
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(26, 115, 232, 0.1); 
         }
         
-        /* Gói Pro nổi bật */
         .price-card.featured { 
-            border-color: rgba(52, 168, 83, 0.2); 
-            background: rgba(10, 25, 15, 0.3);
+            border-color: rgba(52, 168, 83, 0.15); 
+            background: rgba(52, 168, 83, 0.02);
         }
         .price-card.featured:hover { 
+            background: rgba(52, 168, 83, 0.05);
             border-color: #34a853;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(52, 168, 83, 0.15); 
         }
@@ -302,7 +265,7 @@ if (isset($_GET['logout'])) {
         .price-card.featured .btn-action { background: #34a853; box-shadow: 0 4px 12px rgba(52, 168, 83, 0.2); }
         .price-card.featured .btn-action:hover { background: #2d8b47; box-shadow: 0 6px 18px rgba(52, 168, 83, 0.3); }
         
-        /* Thông tin bổ sung */
+        /* Thông tin lợi ích bổ sung */
         .benefits-section { margin-top: 100px; padding: 40px 20px; border-top: 1px solid rgba(255,255,255,0.04); }
         .benefits-section h2 { font-size: 32px; font-weight: 700; margin-bottom: 15px; letter-spacing: -0.5px; }
         .benefits-section .subtitle { color: #888; margin-bottom: 50px; font-size: 16px; }
@@ -328,7 +291,19 @@ if (isset($_GET['logout'])) {
         <div class="logo">Dịch phụ đề & lồng tiếng <span>AI</span></div>
         <div class="user-actions">
             <?php if ($is_logged_in): ?>
-                <div class="user-info"><i class="fa-regular fa-user"></i> Tài khoản: <b><?php echo htmlspecialchars($username); ?></b></div>
+                <div class="account-status-wrapper">
+                    <span class="username-txt"><i class="fa-regular fa-user"></i> <b><?php echo htmlspecialchars($username); ?></b></span>
+                    
+                    <?php if ($has_premium_key): ?>
+                        <span class="badge-header-premium">
+                            <i class="fa-solid fa-crown"></i> Bản quyền Premium
+                        </span>
+                    <?php else: ?>
+                        <span class="badge-header-free" onclick="alert('Bạn chưa nâng cấp gói Premium trực tuyến. Các tính năng mở rộng đám mây hiện đang khóa.')" title="Xem chi tiết">
+                            <i class="fa-solid fa-lock"></i> Tài khoản miễn phí
+                        </span>
+                    <?php endif; ?>
+                </div>
                 <a href="home.php?logout=true" class="btn-logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Đăng Xuất</a>
             <?php else: ?>
                 <a href="index.php" class="btn-auth"><i class="fa-solid fa-user-plus"></i> Đăng Nhập / Đăng Ký</a>
@@ -342,52 +317,6 @@ if (isset($_GET['logout'])) {
             <p>Tăng tốc 300% hiệu suất làm video, phim ngắn, TikTok Reels bằng trí tuệ nhân tạo chuyên sâu</p>
         </div>
 
-        <?php if ($is_logged_in): ?>
-            <div class="my-status-section">
-                <h2><i class="fa-solid fa-circle-user"></i> Trạng thái phân cấp tài khoản</h2>
-                
-                <?php if (isset($error_db)): ?>
-                    <div style="color: #ea4335; font-size: 14px;"><i class="fa-solid fa-circle-exclamation"></i> <?php echo $error_db; ?></div>
-                
-                <?php elseif (empty($user_keys)): ?>
-                    <div class="free-account-box">
-                        <div class="free-account-text">
-                            <h3>Hệ thống phần mềm cục bộ</h3>
-                            <p>Bạn chưa kích hoạt mã bản quyền Premium. Các tính năng mở rộng đám mây tạm thời khóa.</p>
-                        </div>
-                        <span class="badge-free">
-                            <i class="fa-solid fa-gift"></i> Tài khoản miễn phí
-                        </span>
-                    </div>
-                
-                <?php else: ?>
-                    <div class="key-list">
-                        <?php foreach ($user_keys as $key): ?>
-                            <div class="key-item">
-                                <div class="key-info-left">
-                                    <span class="key-badge <?php echo htmlspecialchars(strtolower($key['target_level'] ?? 'pro')); ?>">
-                                        <?php echo htmlspecialchars($key['target_level'] ?? 'PRO'); ?> (<?php echo htmlspecialchars($key['duration_days'] ?? '30'); ?> ngày)
-                                    </span>
-                                    <span class="key-code-display"><?php echo htmlspecialchars($key['key_code']); ?></span>
-                                </div>
-                                
-                                <div class="key-status">
-                                    <?php if (($key['status'] ?? 0) == 0): ?>
-                                        <span class="unused"><i class="fa-solid fa-circle-dot" style="font-size:10px;"></i> Sẵn sàng kích hoạt</span>
-                                    <?php else: ?>
-                                        <span class="used"><i class="fa-solid fa-circle-check"></i> Đã dùng trên thiết bị: <code><?php echo htmlspecialchars($key['device_id'] ?? 'Unknown'); ?></code></span>
-                                    <?php endif; ?>
-                                </div>
-
-                                <button class="btn-copy" onclick="copyKey('<?php echo htmlspecialchars($key['key_code']); ?>', this)">
-                                    <i class="fa-regular fa-copy"></i> Sao chép Key
-                                </button>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
         <div class="pricing-grid">
             <div class="price-card">
                 <div class="badge">Mặc định</div>
@@ -405,7 +334,7 @@ if (isset($_GET['logout'])) {
                     <li><i class="fa-solid fa-check" style="color: #4285F4;"></i> Xuất video đè cứng phụ đề mã hóa Libx264</li>
                     <li class="disabled"><i class="fa-solid fa-xmark"></i> Không có bộ lọc nâng cao (Hộp thoại Blur/Khung mờ)</li>
                 </ul>
-                <a href="#" onclick="alert('Bạn đang sử dụng phiên bản phần mềm cơ bản!')" class="btn-action" style="background:#1e1e24; color:#666; box-shadow:none;">Bản máy cục bộ</a>
+                <a href="#" onclick="alert('Bạn đang sử dụng phiên bản phần mềm máy cục bộ mặc định!')" class="btn-action" style="background:rgba(255,255,255,0.04); color:#666; box-shadow:none;">Bản máy cục bộ</a>
             </div>
 
             <div class="price-card featured">
@@ -423,7 +352,11 @@ if (isset($_GET['logout'])) {
                     <li><i class="fa-solid fa-check" style="color: #34a853;"></i> Tốc độ Render xuất video nhanh gấp 3 lần (GPU)</li>
                     <li><i class="fa-solid fa-check" style="color: #34a853;"></i> Ưu tiên cập nhật bản sửa lỗi tự động</li>
                 </ul>
-                <a href="#" onclick="alert('Vui lòng liên hệ Admin để nhận mã kích hoạt bản PRO!')" class="btn-action">Nâng Cấp Bản Pro →</a>
+                <?php if ($is_logged_in): ?>
+                    <a href="pro.php" class="btn-action">Nâng Cấp Bản Pro →</a>
+                <?php else: ?>
+                    <a href="index.php" onclick="alert('Vui lòng đăng nhập tài khoản để thực hiện nâng cấp gói Pro!')" class="btn-action">Đăng Nhập Để Mua</a>
+                <?php endif; ?>
             </div>
 
             <div class="price-card">
@@ -441,7 +374,11 @@ if (isset($_GET['logout'])) {
                     <li><i class="fa-solid fa-check" style="color: #ea4335;"></i> Bản quyền thương mại hóa âm thanh, video 100%</li>
                     <li><i class="fa-solid fa-check" style="color: #ea4335;"></i> Kênh hỗ trợ kỹ thuật VIP 1 kèm 1 từ đội ngũ Admin</li>
                 </ul>
-                <a href="#" onclick="alert('Vui lòng liên hệ Admin để kích hoạt đặc quyền Ultra!')" class="btn-action" style="background:#ea4335; box-shadow: 0 4px 12px rgba(234, 67, 53, 0.2);">Sở Hữu Bản Ultra →</a>
+                <?php if ($is_logged_in): ?>
+                    <a href="ultra.php" class="btn-action" style="background:#ea4335; box-shadow: 0 4px 12px rgba(234, 67, 53, 0.2);">Sở Hữu Bản Ultra →</a>
+                <?php else: ?>
+                    <a href="index.php" onclick="alert('Vui lòng đăng nhập tài khoản để thực hiện mua đặc quyền gói Ultra!')" class="btn-action" style="background:#ea4335;">Đăng Nhập Để Mua</a>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -479,33 +416,11 @@ if (isset($_GET['logout'])) {
     </footer>
 
     <script>
-        function copyKey(text, btn) {
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã sao chép!';
-                btn.style.background = '#34a853';
-                btn.style.color = '#fff';
-                btn.style.borderColor = '#34a853';
-                
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.style.background = 'rgba(26, 115, 232, 0.1)';
-                    btn.style.color = '#1a73e8';
-                    btn.style.borderColor = 'rgba(26, 115, 232, 0.35)';
-                }, 2000);
-            }).catch(err => {
-                alert('Không thể tự sao chép, hãy bôi đen mã này để copy: ' + text);
-            });
-        }
-    </script>
-
-    <script>
         const canvas = document.getElementById('particle-canvas');
         const ctx = canvas.getContext('2d');
 
         let particlesArray = [];
         const numberOfParticles = 100;
-
         const mouse = { x: null, y: null, radius: 180 };
 
         window.addEventListener('mousemove', function(event) {
@@ -534,8 +449,6 @@ if (isset($_GET['logout'])) {
                 this.size = Math.random() * 2 + 1;
                 this.speedX = (Math.random() * 1) - 0.5;
                 this.speedY = (Math.random() * 1) - 0.5;
-                this.baseX = this.x;
-                this.baseY = this.y;
             }
 
             update() {
